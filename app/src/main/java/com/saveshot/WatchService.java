@@ -1,0 +1,11 @@
+package com.saveshot;
+import android.app.*;import android.content.*;import android.database.*;import android.net.Uri;import android.os.*;import android.provider.MediaStore;import java.util.*;
+public class WatchService extends Service{
+ ContentObserver obs; Handler h=new Handler(Looper.getMainLooper()); long last=0;
+ public void onCreate(){super.onCreate();obs=new ContentObserver(h){public void onChange(boolean self,Uri u){scan();}};getContentResolver().registerContentObserver(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,true,obs);scan();}
+ public int onStartCommand(Intent i,int f,int id){if(i!=null&&"SCAN".equals(i.getAction()))scan();return START_STICKY;}
+ void scan(){new Thread(()->{try(Cursor c=getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,new String[]{MediaStore.Images.Media._ID,MediaStore.Images.Media.DISPLAY_NAME,MediaStore.Images.Media.RELATIVE_PATH,MediaStore.Images.Media.DATE_ADDED},null,null,MediaStore.Images.Media.DATE_ADDED+" DESC")){if(c!=null&&c.moveToFirst()){String name=c.getString(1),path=c.getString(2);if(name!=null&&(name.toLowerCase().contains("screenshot")||(path!=null&&path.toLowerCase().contains("screenshot")))){long t=c.getLong(3);if(t>last){last=t;notifyUser();}}}}}catch(Exception ignored){}}).start();}
+ void notifyUser(){NotificationManager n=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);String ch="shots";if(Build.VERSION.SDK_INT>=26)n.createNotificationChannel(new NotificationChannel(ch,"SaveShot",NotificationManager.IMPORTANCE_DEFAULT));Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,ch):new Notification.Builder(this);b.setSmallIcon(android.R.drawable.ic_menu_camera).setContentTitle("SaveShot detected a screenshot").setContentText("Open SaveShot to turn it into an action.").setAutoCancel(true);n.notify(22,b.build());}
+ public void onDestroy(){if(obs!=null)getContentResolver().unregisterContentObserver(obs);super.onDestroy();}
+ public android.os.IBinder onBind(Intent i){return null;}
+}
